@@ -156,6 +156,12 @@ otai_status_t Syncd::processSingleEvent(
     if (op == REDIS_ASIC_STATE_COMMAND_GET)
         return processQuadEvent(OTAI_COMMON_API_GET, kco);
 
+    if (op == REDIS_ASIC_STATE_COMMAND_NOTIFY)
+    {
+        SWSS_LOG_NOTICE("notify event on ASIC channel, skipping (handled via notification channel)");
+        return OTAI_STATUS_SUCCESS;
+    }
+
     SWSS_LOG_THROW("event op '%s' is not implemented, FIXME", op.c_str());
 }
 

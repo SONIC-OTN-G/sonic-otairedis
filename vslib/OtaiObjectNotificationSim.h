@@ -21,7 +21,10 @@ namespace otaivs
 
         private:    
             [[noreturn]] void sendLinecardNotifications(otai_object_id_t linecard_id);
-            void sendAlarmNotification(otai_object_id_t linecard_id);
+            void sendAlarmNotification(otai_object_id_t linecard_id, otai_alarm_type_t alarm_type, otai_alarm_status_t alarm_status, otai_alarm_severity_t alarm_severity, const string& alarm_text);
+            // 讀 otai_linecard_notification_sim.json 的告警注入配置;
+            // 返回 alarm_status(-1=本輪不要求發送),並帶出 type/severity/text(缺省=高溫/MAJOR)
+            int readAlarmConfig(otai_alarm_type_t& alarm_type, otai_alarm_severity_t& alarm_severity, string& alarm_text);
             void sendOcmScanNotification(otai_object_id_t linecard_id, otai_object_id_t ocm_id);
             void sendOtdrScanNotification(otai_object_id_t linecard_id, otai_object_id_t otdr_id);
             void sendLinecardStateNotification(otai_object_id_t linecard_id, otai_oper_status_t status);

@@ -13,7 +13,7 @@ namespace syncd
 {
 
 #define PM_CYCLE_1_SEC           (1000000000ull)
-#define PM_CYCLE_15_MINS         (15 * 60 * PM_CYCLE_1_SEC)
+#define PM_CYCLE_15_MINS         (5 * 60 * PM_CYCLE_1_SEC)  /* 演示版:15min→5min 窗口 */
 #define PM_CYCLE_24_HOURS        (24 * 60 * 60 * PM_CYCLE_1_SEC)
 
 #define EXPIRE_TIME_2_DAYS  (2 * 24 * 60 * 60)

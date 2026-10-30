@@ -35,7 +35,7 @@ clean:
 build:
 	echo build stage is skipped. Please use binary to generate debian packages
 
-binary: binary-syncd
+binary: binary-syncd-ot-vs
 
 binary-otairedis:
 	echo '--enable-syncd=no' > /tmp/syncd-build

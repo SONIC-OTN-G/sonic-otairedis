@@ -61,7 +61,14 @@ void OtaiObjectNotificationSim::updateNotificationCallback(
 [[noreturn]] void OtaiObjectNotificationSim::sendLinecardNotifications(otai_object_id_t linecard_id)
 {
     this_thread::sleep_for(chrono::seconds(10));
-    sendAlarmNotification(linecard_id);
+
+    // 兼容行為:create 後 10 秒一次性基線告警(硬編碼高溫/ACTIVE/MAJOR)
+    sendAlarmNotification(linecard_id, OTAI_ALARM_TYPE_HIGH_TEMPERATURE_ALARM, OTAI_ALARM_STATUS_ACTIVE, OTAI_ALARM_SEVERITY_MAJOR, "high temperature");
+
+    // 告警注入旋鈕:每次循環讀 otai_linecard_notification_sim.json 的 alarm_status,
+    // 值變化才發(0=ACTIVE 1=INACTIVE 2=TRANSIENT;-1/缺省=不發)
+    int last_alarm_status = -1;
+
     otai_oper_status_t linecardOperStatus = OTAI_OPER_STATUS_ACTIVE;
     while (true)
     {
@@ -69,6 +76,16 @@ void OtaiObjectNotificationSim::updateNotificationCallback(
         if(operStatus != linecardOperStatus) {
             sendLinecardStateNotification(linecard_id, operStatus);
             linecardOperStatus = operStatus;
+        }
+
+        otai_alarm_type_t cfg_type;
+        otai_alarm_severity_t cfg_severity;
+        string cfg_text;
+        int cfg_status = readAlarmConfig(cfg_type, cfg_severity, cfg_text);
+        if (cfg_status >= 0 && cfg_status < OTAI_ALARM_STATUS_MAX && cfg_status != last_alarm_status) {
+            SWSS_LOG_NOTICE("Alarm injection via sim json: status=%d type=%d severity=%d", cfg_status, (int)cfg_type, (int)cfg_severity);
+            sendAlarmNotification(linecard_id, cfg_type, (otai_alarm_status_t)cfg_status, cfg_severity, cfg_text);
+            last_alarm_status = cfg_status;
         }
 
         this_thread::sleep_for(chrono::seconds(5));
@@ -100,21 +117,48 @@ otai_oper_status_t OtaiObjectNotificationSim::readOperStatus(string filename)
     return result;
 }
 
-void OtaiObjectNotificationSim::sendAlarmNotification(otai_object_id_t linecard_id)
+int OtaiObjectNotificationSim::readAlarmConfig(otai_alarm_type_t& alarm_type, otai_alarm_severity_t& alarm_severity, string& alarm_text)
 {
-    otai_alarm_type_t alarm_type = OTAI_ALARM_TYPE_HIGH_TEMPERATURE_ALARM;
+    alarm_type = OTAI_ALARM_TYPE_HIGH_TEMPERATURE_ALARM;
+    alarm_severity = OTAI_ALARM_SEVERITY_MAJOR;
+    alarm_text = "high temperature";
+
+    string sim_data_file = sim_data_path + "otai_linecard_notification_sim.json";
+    std::ifstream ifs(sim_data_file);
+    if (!ifs.good())
+    {
+        return -1;
+    }
+
+    try
+    {
+        nlohmann::json jsonData = json::parse(ifs);
+        if (jsonData.contains("alarm_type"))     alarm_type     = (otai_alarm_type_t)jsonData["alarm_type"].get<int>();
+        if (jsonData.contains("alarm_severity")) alarm_severity = (otai_alarm_severity_t)jsonData["alarm_severity"].get<int>();
+        if (jsonData.contains("alarm_text"))     alarm_text     = jsonData["alarm_text"].get<string>();
+        if (jsonData.contains("alarm_status"))   return jsonData["alarm_status"].get<int>();
+    }
+    catch (const std::exception& e)
+    {
+        SWSS_LOG_ERROR("OtaiObjectNotificationSim failed to parse alarm config: %s", e.what());
+    }
+
+    return -1;
+}
+
+void OtaiObjectNotificationSim::sendAlarmNotification(otai_object_id_t linecard_id, otai_alarm_type_t alarm_type, otai_alarm_status_t alarm_status, otai_alarm_severity_t alarm_severity, const string& alarm_text)
+{
     otai_alarm_info_t alarm_info;
     alarm_info.resource_oid = linecard_id;
     alarm_info.time_created = (uint64_t)chrono::duration_cast<chrono::nanoseconds>(chrono::system_clock::now().time_since_epoch()).count();
-    alarm_info.status = OTAI_ALARM_STATUS_ACTIVE;
-    alarm_info.severity = OTAI_ALARM_SEVERITY_MAJOR;
-    char text[] = "high temperature";
-    alarm_info.text.count = static_cast<uint32_t>(strlen(text));
-    alarm_info.text.list = (int8_t *)text;
+    alarm_info.status = alarm_status;
+    alarm_info.severity = alarm_severity;
+    alarm_info.text.count = static_cast<uint32_t>(alarm_text.size());
+    alarm_info.text.list = (int8_t *)alarm_text.c_str();
 
-    SWSS_LOG_NOTICE("Sending notification for linecard:%s alarm",
-            otai_serialize_object_id(linecard_id).c_str());
-    m_alarmCallback(linecard_id, alarm_type, alarm_info); 
+    SWSS_LOG_NOTICE("Sending notification for linecard:%s alarm type:%d status:%d severity:%d text:'%s'",
+            otai_serialize_object_id(linecard_id).c_str(), (int)alarm_type, (int)alarm_status, (int)alarm_severity, alarm_text.c_str());
+    m_alarmCallback(linecard_id, alarm_type, alarm_info);
 }
 
 void OtaiObjectNotificationSim::sendOcmScanNotification(otai_object_id_t linecard_id, otai_object_id_t ocm_id)

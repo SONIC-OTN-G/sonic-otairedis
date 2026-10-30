@@ -192,10 +192,11 @@ void Collector::updateTimeFlags()
     m_collectTime = nanoseconds_count;
 
     if ((m_counter15min == 0) ||
-        ((minutes_count % 15) == 0 && (minutes_count / 15) > m_counter15min))
+        ((minutes_count % 5) == 0 && (minutes_count / 5) > m_counter15min))  /* 演示版:5 分邊界 */
     {
         m_timeout15min = true;
-        m_counter15min = minutes_count / 15;
+        m_counter15min = minutes_count / 5;
+        SWSS_LOG_NOTICE("PMDEBUG: 5min cycle boundary, m_counter15min=%ld", m_counter15min);
     }
  
     if ((m_counter24hour == 0) ||
