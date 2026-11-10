@@ -66,7 +66,9 @@ Syncd::Syncd(
 
     //Notifications
     m_notifications = std::make_shared<RedisNotificationProducer>("ASIC_DB");
-    m_processor = std::make_shared<NotificationProcessor>(m_notifications, m_client, std::bind(&Syncd::syncProcessNotification, this, _1));
+    auto npDbAsic = std::make_shared<swss::DBConnector>("ASIC_DB", 0);
+    auto npClient = std::make_shared<RedisClient>(npDbAsic, m_dbFlexCounter);
+    m_processor = std::make_shared<NotificationProcessor>(m_notifications, npClient, std::bind(&Syncd::syncProcessNotification, this, _1));
     m_handler = std::make_shared<NotificationHandler>(m_processor);
     m_ln.onLinecardStateChange = std::bind(&NotificationHandler::onLinecardStateChange, m_handler.get(), _1, _2);
     m_ln.onLinecardAlarm = std::bind(&NotificationHandler::onLinecardAlarm, m_handler.get(), _1, _2, _3);
@@ -83,7 +85,8 @@ Syncd::Syncd(
         std::make_shared<otairedis::VirtualObjectIdManager>(
             m_redisVidIndexGenerator);
     m_translator = std::make_shared<VirtualOidTranslator>(m_client, m_virtualObjectIdManager, vendorOtai);
-    m_processor->m_translator = m_translator; 
+    auto npTranslator = std::make_shared<VirtualOidTranslator>(npClient, m_virtualObjectIdManager, vendorOtai);
+    m_processor->m_translator = npTranslator;
 
     //vendor otai
     loadProfileMap();

@@ -630,7 +630,18 @@ void NotificationProcessor::ntf_process_function()
 
         while (m_notificationQueue->tryDequeue(item))
         {
-            processNotification(item);
+            try
+            {
+                processNotification(item);
+            }
+            catch (const std::exception& e)
+            {
+                SWSS_LOG_ERROR("notification processing failed: %s", e.what());
+            }
+            catch (...)
+            {
+                SWSS_LOG_ERROR("notification processing failed: unknown exception");
+            }
         }
     }
 }
